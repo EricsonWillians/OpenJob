@@ -1,55 +1,73 @@
-import json
+import sqlite3
 import uuid
 from datetime import datetime
 
 class JobManagement:
     def __init__(self):
-        self.jobs = []  # List to store job listings
+        # SQLite database connection
+        self.conn = sqlite3.connect('jobs.db')
+        self.c = self.conn.cursor()
+        
+        # Create table if it does not exist
+        self.c.execute("""
+            CREATE TABLE IF NOT EXISTS jobs (
+                job_id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                description TEXT NOT NULL,
+                budget REAL NOT NULL,
+                deadline TEXT NOT NULL,
+                posted_at TEXT NOT NULL,
+                status TEXT NOT NULL
+            )
+        """)
+        self.conn.commit()
 
     def create_job(self, title, description, budget, deadline):
         # Create a new job listing
         job_id = str(uuid.uuid4())
-        job = {
-            'job_id': job_id,
-            'title': title,
-            'description': description,
-            'budget': budget,
-            'deadline': deadline,
-            'posted_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            'status': 'open'  # Job status can be 'open', 'in_progress', 'completed', 'closed'
-        }
+        posted_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        status = 'open'
         
-        self.jobs.append(job)
+        self.c.execute("INSERT INTO jobs VALUES (?, ?, ?, ?, ?, ?, ?)",
+                       (job_id, title, description, budget, deadline, posted_at, status))
+        self.conn.commit()
         return job_id
 
     def update_job(self, job_id, **kwargs):
-        # Update an existing job listing
-        for job in self.jobs:
-            if job['job_id'] == job_id:
-                for key, value in kwargs.items():
-                    if key in job:
-                        job[key] = value
-                return True
-        return False
+        for key, value in kwargs.items():
+            self.c.execute(f"UPDATE jobs SET {key} = ? WHERE job_id = ?", (value, job_id))
+        self.conn.commit()
 
     def get_job(self, job_id):
-        # Retrieve job by job_id
-        for job in self.jobs:
-            if job['job_id'] == job_id:
-                return job
+        self.c.execute("SELECT * FROM jobs WHERE job_id = ?", (job_id,))
+        row = self.c.fetchone()
+        if row:
+            return {
+                'job_id': row[0],
+                'title': row[1],
+                'description': row[2],
+                'budget': row[3],
+                'deadline': row[4],
+                'posted_at': row[5],
+                'status': row[6]
+            }
         return None
 
     def list_jobs(self):
-        # Return all job listings
-        return self.jobs
-
-    def serialize_jobs(self):
-        # Serialize job listings to JSON
-        return json.dumps(self.jobs)
-
-    def deserialize_jobs(self, job_data):
-        # Load job listings from JSON data
-        self.jobs = json.loads(job_data)
+        self.c.execute("SELECT * FROM jobs")
+        rows = self.c.fetchall()
+        jobs = []
+        for row in rows:
+            jobs.append({
+                'job_id': row[0],
+                'title': row[1],
+                'description': row[2],
+                'budget': row[3],
+                'deadline': row[4],
+                'posted_at': row[5],
+                'status': row[6]
+            })
+        return jobs
 
 if __name__ == "__main__":
     job_manager = JobManagement()

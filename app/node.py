@@ -40,3 +40,18 @@ class P2PNode:
         await self.host.connect(info)
 
     async def send_message(self, peer_id_str: str, message: str):
+        """
+        Sends a message to a connected peer.
+        """
+        peer_id = ID(peer_id_str)
+        stream = await self.host.new_stream(peer_id, ["/openjob/1.0.0"])
+        await stream.write(message.encode('utf-8'))
+
+    async def start(self):
+        await self.setup()
+        await self.connect_to_peer("/ip4/127.0.0.1/tcp/12345", "QmPeerID12345")
+        await self.send_message("QmPeerID12345", "Hello, World!")
+
+if __name__ == "__main__":
+    node = P2PNode()
+    asyncio.get_event_loop().run_until_complete(node.start())
